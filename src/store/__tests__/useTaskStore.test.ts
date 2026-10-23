@@ -1,9 +1,26 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AGE_FILTER_STORAGE_KEY, useTaskStore } from '../useTaskStore';
-import type { Task } from '@/types/task';
+import { AGE_FILTER_STORAGE_KEY, SELECTED_BOARD_STORAGE_KEY, useTaskStore } from '../useTaskStore';
+import type { Board, Task } from '@/types/task';
+
+const sampleBoard: Board = {
+  public_id: '01950000-0000-7000-8000-000000000010',
+  title: 'Sample Board',
+  description: 'Board description',
+  created_at: '2026-10-16T10:00:00.000Z',
+  updated_at: '2026-10-16T10:00:00.000Z',
+};
+
+const secondBoard: Board = {
+  public_id: '01950000-0000-7000-8000-000000000020',
+  title: 'Second Board',
+  description: 'Second description',
+  created_at: '2026-10-16T10:00:00.000Z',
+  updated_at: '2026-10-16T10:00:00.000Z',
+};
 
 const sampleTask: Task = {
   public_id: '01950000-0000-7000-8000-000000000001',
+  board_id: '01950000-0000-7000-8000-000000000010',
   title: 'Initial task',
   description: 'Initial description',
   status: 'todo',
@@ -92,5 +109,41 @@ describe('useTaskStore', () => {
     localStorage.clear();
     useTaskStore.getState().syncAgeFiltersFromStorage();
     expect(useTaskStore.getState().selectedAgeFilters).toEqual([]);
+  });
+
+  it('persists selected board to localStorage and hydrates on reload simulation', () => {
+    useTaskStore.getState().selectBoard(sampleBoard.public_id);
+    expect(useTaskStore.getState().selectedBoardId).toBe(sampleBoard.public_id);
+    expect(localStorage.getItem(SELECTED_BOARD_STORAGE_KEY)).toBe(sampleBoard.public_id);
+
+    // Reopen/reload simulation
+    useTaskStore.setState({ selectedBoardId: null });
+    useTaskStore.getState().syncSelectedBoardFromStorage();
+    expect(useTaskStore.getState().selectedBoardId).toBe(sampleBoard.public_id);
+
+    // Deselecting board clears localStorage
+    useTaskStore.getState().selectBoard(null);
+    expect(useTaskStore.getState().selectedBoardId).toBeNull();
+    expect(localStorage.getItem(SELECTED_BOARD_STORAGE_KEY)).toBeNull();
+  });
+
+  it('clears stored selected board on clearSession and invalidates when board is absent in fetched boards', () => {
+    useTaskStore.getState().selectBoard(sampleBoard.public_id);
+    expect(localStorage.getItem(SELECTED_BOARD_STORAGE_KEY)).toBe(sampleBoard.public_id);
+
+    // Signing out clears session and the stored selected board
+    useTaskStore.getState().clearSession();
+    expect(useTaskStore.getState().selectedBoardId).toBeNull();
+    expect(localStorage.getItem(SELECTED_BOARD_STORAGE_KEY)).toBeNull();
+
+    // Board present in fetched list is preserved
+    useTaskStore.getState().selectBoard(sampleBoard.public_id);
+    useTaskStore.getState().setBoards([sampleBoard, secondBoard]);
+    expect(useTaskStore.getState().selectedBoardId).toBe(sampleBoard.public_id);
+
+    // If fetched boards do not include selected board, resets selection and clears localStorage
+    useTaskStore.getState().setBoards([secondBoard]);
+    expect(useTaskStore.getState().selectedBoardId).toBeNull();
+    expect(localStorage.getItem(SELECTED_BOARD_STORAGE_KEY)).toBeNull();
   });
 });

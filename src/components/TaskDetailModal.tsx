@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTasksApi } from "@/hooks/useTasksApi";
 import { useTaskStore } from "@/store/useTaskStore";
+import type { TaskStatus } from "@/types/task";
 import { getTaskAgeLabel } from "@/utils/format";
 
 export function TaskDetailModal() {
@@ -22,10 +23,11 @@ export function TaskDetailModal() {
   const task = useTaskStore((state) =>
     state.tasks.find((t) => t.public_id === state.selectedTaskId),
   );
-  const { updateTask } = useTasksApi();
+  const { updateTask, deleteTask, moveTaskStatus } = useTasksApi();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("todo");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,16 +35,18 @@ export function TaskDetailModal() {
     if (task) {
       setTitle(task.title);
       setDescription(task.description);
+      setStatus(task.status);
       setError(null);
       setIsSubmitting(false);
     }
   }, [task]);
 
   const isOpen = Boolean(selectedTaskId && task);
-  const isDirty = task
+  const isContentDirty = task
     ? title !== task.title || description !== task.description
     : false;
-  const canUpdate = isDirty && title.trim().length > 0 && !isSubmitting;
+  const isStatusDirty = task ? status !== task.status : false;
+  const canUpdate = (isContentDirty || isStatusDirty) && title.trim().length > 0 && !isSubmitting;
 
   const handleClose = () => {
     selectTask(null);
@@ -59,14 +63,32 @@ export function TaskDetailModal() {
     setIsSubmitting(true);
     setError(null);
     try {
-      await updateTask(task.public_id, {
-        title,
-        description,
-        expectedVersion: task.version,
-      });
+      if (isContentDirty) {
+        await updateTask(task.public_id, {
+          title,
+          description,
+          expectedVersion: task.version,
+        });
+      }
+      if (isStatusDirty) {
+        await moveTaskStatus(task.public_id, status);
+      }
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task");
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!task || !window.confirm(`Delete “${task.title}”?`)) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await deleteTask(task.public_id);
+      handleClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete task");
       setIsSubmitting(false);
     }
   };
@@ -104,6 +126,20 @@ export function TaskDetailModal() {
           </div>
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="detail-task-status">Status</Label>
+            <select
+              id="detail-task-status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value as TaskStatus)}
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
+            >
+              <option value="todo">TODO</option>
+              <option value="doing">Doing</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="detail-task-description">Description</Label>
             <Textarea
               id="detail-task-description"
@@ -123,6 +159,14 @@ export function TaskDetailModal() {
           )}
 
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleDelete()}
+              disabled={isSubmitting}
+            >
+              Delete
+            </Button>
             <Button
               type="button"
               variant="outline"

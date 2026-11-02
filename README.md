@@ -85,3 +85,29 @@ Run TypeScript type checking:
 ```bash
 npm run lint
 ```
+
+## CI/CD & Deployment
+
+GitHub Actions verifies pull requests and deploys the production frontend:
+
+- **CI (`.github/workflows/ci.yaml`)**: Runs on pull requests and pushes to `master`. It installs dependencies with `npm ci`, then runs `npm test`, `npm run lint`, and `npm run build`.
+- **Build and Deploy (`.github/workflows/build-and-deploy.yaml`)**: Runs on pushes to `master`. After the same quality gates pass, it builds and publishes `ghcr.io/muktiwbw/oya-fe:latest` and a commit-SHA image, then restarts the `oya-fe` Docker Compose service on the VPS.
+
+The production image serves the Vite bundle through Nginx and falls back to `index.html` for client-side routes. It also proxies `/api` requests to the `oya-be` container over the shared external `web` Docker network, keeping API calls, refresh cookies, and the OAuth callback on the frontend origin. The VPS project directory must contain an `.env` file (or symlink) with the frontend hostname and the backend container port:
+
+```env
+OYA_HTTP_DOMAIN=frontend.example.com
+OYA_BE_HTTP_PORT=your-backend-container-port
+```
+
+`OYA_BE_HTTP_PORT` must match the backend's VPS-only HTTP port configuration; it is not committed to this repository. The backend may use the same `OYA_HTTP_DOMAIN` variable name because Compose resolves it separately in each project directory.
+
+Configure these GitHub Actions repository secrets:
+
+| Secret | Description |
+| --- | --- |
+| `SSH_HOST` | VPS hostname or IP address |
+| `SSH_USER` | SSH username on the VPS |
+| `SSH_PRIVATE_KEY` | Private key used to authenticate to the VPS |
+| `SSH_PORT` | Optional SSH port; defaults to `22` |
+| `PROJECT_PATH` | Absolute frontend project directory on the VPS |

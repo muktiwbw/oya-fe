@@ -111,3 +111,5 @@ Configure these GitHub Actions repository secrets:
 | `SSH_PRIVATE_KEY` | Private key used to authenticate to the VPS |
 | `SSH_PORT` | Optional SSH port; defaults to `22` |
 | `PROJECT_PATH` | Absolute frontend project directory on the VPS |
+
+The deployment workflow publishes to GitHub Container Registry as `ghcr.io/muktiwbw/oya-fe`. If that package already exists, open its **Package settings** on GitHub and add the `muktiwbw/oya-fe` repository under **Manage Actions access** with the **Write** role. New packages created by this workflow are linked automatically.

@@ -1,0 +1,18 @@
+services:
+  oya-fe:
+    image: ghcr.io/muktiwbw/oya-fe:latest
+    restart: always
+    environment:
+      OYA_BE_HTTP_PORT: ${OYA_BE_HTTP_PORT:?Set OYA_BE_HTTP_PORT to the backend container port}
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.oya-fe.rule=Host(`${OYA_HTTP_DOMAIN}`)"
+      - "traefik.http.routers.oya-fe.entrypoints=websecure"
+      - "traefik.http.routers.oya-fe.tls.certresolver=leresolver"
+      - "traefik.http.services.oya-fe.loadbalancer.server.port=80"
+
+networks:
+  web:
+    external: true
